@@ -6,10 +6,10 @@ import torch.nn as nn
 class DCSAF(nn.Module):
     """
     Dynamic Channel-Spatial Cross Attention Fusion
-
     Adapted for Encoder-Decoder Feature Fusion
     in Grayscale Image Colorization.
     """
+
     def __init__(self, c, r=16):
         super().__init__()
         # Channel Attention
@@ -35,10 +35,7 @@ class DCSAF(nn.Module):
         # Channel attention
         c = self.ca(x)
         # Spatial attention
-        s = self.sa(torch.cat([
-            x.mean(1, keepdim=True),
-            x.max(1, keepdim=True)[0]
-        ], dim=1))
+        s = self.sa(torch.cat([x.mean(1, keepdim=True),x.max(1, keepdim=True)[0]], dim=1))
         return c * s
 
     def forward(self, enc, dec):

@@ -10,10 +10,12 @@ downsampling, attention, and improved skip fusion should be added as separate
 experimental variants so that their effects can be evaluated independently.
 """
 
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import ResNet18_Weights, resnet18
+from DCSAF import DCSAF
 
 
 class DecoderBlock(nn.Module):
@@ -28,6 +30,9 @@ class DecoderBlock(nn.Module):
             kernel_size=2,
             stride=2,
         )
+
+        # DCSAF attention fusion
+       # self.dcsaf = DCSAF(out_channels)
 
         self.fusion = nn.Sequential(
             nn.Conv2d(out_channels + skip_channels, out_channels, 3, padding=1),
@@ -52,6 +57,13 @@ class DecoderBlock(nn.Module):
 
         fused_feature = torch.cat([decoder_feature, skip_feature], dim=1)
         return self.fusion(fused_feature)
+
+        # # DCSAF cross-feature enhancement
+        # skip_feature, decoder_feature = self.dcsaf(skip_feature, decoder_feature)
+        # # Original U-Net concatenation
+        # fused_feature = torch.cat([decoder_feature, skip_feature], dim=1)
+
+        # return self.fusion(fused_feature)
 
 
 class ColorFusionNetBaseline(nn.Module):
@@ -124,6 +136,7 @@ class ColorFusionNetBaseline(nn.Module):
         skip1 = self.layer1(self.maxpool(skip0))     # 64,  H/4
         skip2 = self.layer2(skip1)                   # 128, H/8
         skip3 = self.layer3(skip2)                   # 256, H/16
+
         bottleneck = self.layer4(skip3)              # 512, H/32
 
         x = self.decoder3(bottleneck, skip3)          # 256, H/16
