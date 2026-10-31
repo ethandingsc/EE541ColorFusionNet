@@ -1,13 +1,37 @@
 import random
+from pathlib import Path
 
 import numpy as np
 import torch
 from PIL import Image
 from skimage.color import lab2rgb, rgb2lab
-from torch.utils.data import DataLoader, Dataset, Subset
-from torchvision import datasets
+from torch.utils.data import DataLoader, Dataset
 
 import config
+
+
+class ImageFileDataset(Dataset):
+    """Load unlabeled images recursively from a directory."""
+
+    SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+    def __init__(self, root):
+        self.root = Path(root)
+        self.image_paths = sorted(
+            path
+            for path in self.root.rglob("*")
+            if path.is_file() and path.suffix.lower() in self.SUPPORTED_EXTENSIONS
+        )
+        if not self.image_paths:
+            raise RuntimeError(f"No images found in: {self.root}")
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, index):
+        with Image.open(self.image_paths[index]) as image:
+            image = image.convert("RGB").copy()
+        return image, 0
 
 
 def lab_to_rgb(lightness, chrominance):
@@ -53,20 +77,19 @@ def _make_loader(dataset, shuffle=False):
 
 
 def get_train_val_loaders():
-    """Use STL10 train data and a fixed 90/10 train-validation split."""
-    base = datasets.STL10(root=str(config.DATA_ROOT), split="train", download=True)
-    generator = torch.Generator().manual_seed(config.SEED)
-    indices = torch.randperm(len(base), generator=generator).tolist()
-    val_size = max(1, int(len(indices) * config.VAL_RATIO))
-    val_indices = indices[:val_size]
-    train_indices = indices[val_size:]
-
-    train_set = Subset(ColorizationDataset(base, augment=True), train_indices)
-    val_set = Subset(ColorizationDataset(base, augment=False), val_indices)
+    """Load unlabeled images from data/train and data/val."""
+    train_set = ColorizationDataset(
+        ImageFileDataset(config.DATA_ROOT / "train"),
+        augment=True,
+    )
+    val_set = ColorizationDataset(
+        ImageFileDataset(config.DATA_ROOT / "val"),
+        augment=False,
+    )
     return _make_loader(train_set, shuffle=True), _make_loader(val_set)
 
 
 def get_test_loader():
-    """Use the official STL10 test split only for final evaluation."""
-    base = datasets.STL10(root=str(config.DATA_ROOT), split="test", download=True)
+    """Load unlabeled images from data/test for final evaluation."""
+    base = ImageFileDataset(config.DATA_ROOT / "test")
     return _make_loader(ColorizationDataset(base, augment=False))

@@ -63,7 +63,6 @@ def train():
     train_loader, val_loader = get_train_val_loaders()
 
     model = Colorizer(
-        pretrained=config.PRETRAINED,
         freeze_encoder=config.FREEZE_ENCODER,
     ).to(config.DEVICE)
     optimizer = torch.optim.AdamW(

@@ -14,7 +14,8 @@ experimental variants so that their effects can be evaluated independently.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import ResNet18_Weights, resnet18
+from torchvision.models import resnet18
+#from custom_resnet import ResNet18
 from DCSAF import DCSAF
 
 
@@ -69,11 +70,10 @@ class DecoderBlock(nn.Module):
 class ColorFusionNetBaseline(nn.Module):
     """ResNet-18 encoder with a U-Net-style convolutional decoder."""
 
-    def __init__(self, pretrained: bool = True, freeze_encoder: bool = False):
+    def __init__(self, freeze_encoder: bool = False):
         super().__init__()
 
-        weights = ResNet18_Weights.DEFAULT if pretrained else None
-        encoder = resnet18(weights=weights)
+        encoder = resnet18()
 
         # ResNet-18 feature sizes:
         # stem: 64, layer1: 64, layer2: 128, layer3: 256, layer4: 512
@@ -95,16 +95,6 @@ class ColorFusionNetBaseline(nn.Module):
             nn.Tanh(),
         )
 
-        # ImageNet normalization used by the pretrained ResNet-18 encoder.
-        self.register_buffer(
-            "imagenet_mean",
-            torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1),
-        )
-        self.register_buffer(
-            "imagenet_std",
-            torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1),
-        )
-
         if freeze_encoder:
             self.set_encoder_trainable(False)
 
@@ -122,15 +112,14 @@ class ColorFusionNetBaseline(nn.Module):
             for parameter in part.parameters():
                 parameter.requires_grad = trainable
 
-    def normalize_l_for_resnet(self, lightness: torch.Tensor) -> torch.Tensor:
-        """Convert Lab L in [0, 100] to a 3-channel ImageNet-style input."""
+    def prepare_l_for_resnet(self, lightness: torch.Tensor) -> torch.Tensor:
+        """Convert Lab L in [0, 100] to a 3-channel input in [0, 1]."""
 
-        image = (lightness / 100.0).repeat(1, 3, 1, 1)
-        return (image - self.imagenet_mean) / self.imagenet_std
+        return (lightness / 100.0).repeat(1, 3, 1, 1)
 
     def forward(self, lightness: torch.Tensor) -> torch.Tensor:
         input_size = lightness.shape[-2:]
-        x = self.normalize_l_for_resnet(lightness)
+        x = self.prepare_l_for_resnet(lightness)
 
         skip0 = self.stem(x)                         # 64,  H/2
         skip1 = self.layer1(self.maxpool(skip0))     # 64,  H/4
@@ -157,7 +146,7 @@ Colorizer = ColorFusionNetBaseline
 
 
 if __name__ == "__main__":
-    model = ColorFusionNetBaseline(pretrained=False)
+    model = ColorFusionNetBaseline()
     sample_l = torch.rand(2, 1, 256, 256) * 100.0
     sample_ab = model(sample_l)
     print("Input shape: ", tuple(sample_l.shape))

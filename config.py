@@ -17,6 +17,5 @@ VAL_RATIO = 0.1
 NUM_WORKERS = 0
 SEED = 42
 
-PRETRAINED = True
 FREEZE_ENCODER = False
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
