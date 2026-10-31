@@ -1,0 +1,5 @@
+# Keep the dataset directory structure but do not commit image data.
+*
+!*/
+!.gitignore
+!.gitkeep
